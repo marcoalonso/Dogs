@@ -6,9 +6,12 @@
 //
 
 import XCTest
+import CoreData
 @testable import Dogs
 
 final class DogListViewModelTests: XCTestCase {
+
+    // MARK: - ViewModel Tests
 
     func testSuccessfulFetchDogs() async {
         let mockDogs = Dog.mockList
@@ -85,5 +88,70 @@ final class DogListViewModelTests: XCTestCase {
         await MainActor.run {
             XCTAssertNil(newViewModel.errorMessage)
         }
+    }
+
+    // MARK: - Core Data (DogLocalDataSource) Tests
+
+    var inMemoryContext: NSManagedObjectContext!
+    var dataSource: DogLocalDataSource!
+
+    override func setUp() {
+        super.setUp()
+
+        let container = NSPersistentContainer(name: "DogsDB")
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        container.persistentStoreDescriptions = [description]
+
+        let expectation = self.expectation(description: "Load persistent stores")
+        container.loadPersistentStores { _, error in
+            XCTAssertNil(error)
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+
+        inMemoryContext = container.viewContext
+        dataSource = DogLocalDataSource(context: inMemoryContext)
+    }
+
+    override func tearDown() {
+        inMemoryContext = nil
+        dataSource = nil
+        super.tearDown()
+    }
+
+    func test_saveDogs_savesCorrectly() throws {
+        let dogs = [
+            DogDTO(dogName: "Fido", description: "Friendly dog", age: 3, image: "https://img.com/fido.jpg"),
+            DogDTO(dogName: "Luna", description: "Smart dog", age: 5, image: "https://img.com/luna.jpg")
+        ]
+
+        try dataSource.saveDogs(dogs)
+
+        let fetchRequest: NSFetchRequest<DogEntity> = DogEntity.fetchRequest()
+        let savedDogs = try inMemoryContext.fetch(fetchRequest)
+
+        XCTAssertEqual(savedDogs.count, 2)
+
+        let savedNames = savedDogs.compactMap { $0.name }
+        XCTAssertTrue(savedNames.contains("Fido"))
+        XCTAssertTrue(savedNames.contains("Luna"))
+    }
+
+    func test_fetchDogs_returnsCorrectDTOs() throws {
+        let entity = DogEntity(context: inMemoryContext)
+        entity.name = "Max"
+        entity.dogDescription = "Guardian"
+        entity.age = 4
+        entity.image = "https://img.com/max.jpg"
+        try inMemoryContext.save()
+
+        let result = try dataSource.fetchDogs()
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.dogName, "Max")
+        XCTAssertEqual(result.first?.description, "Guardian")
+        XCTAssertEqual(result.first?.age, 4)
+        XCTAssertEqual(result.first?.image, "https://img.com/max.jpg")
     }
 }
