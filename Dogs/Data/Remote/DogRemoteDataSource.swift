@@ -7,10 +7,6 @@
 
 import Foundation
 
-protocol DogRemoteDataSourceProtocol {
-    func fetchDogs() async throws -> [DogDTO]
-}
-
 final class DogRemoteDataSource: DogRemoteDataSourceProtocol {
     private let urlString = "https://jsonblob.com/api/1151549092634943488"
 
