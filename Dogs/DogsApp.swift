@@ -11,7 +11,12 @@ import SwiftUI
 struct DogsApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            let remoteDataSource = DogRemoteDataSource()
+            let repository = DogRepositoryImpl(remoteDataSource: remoteDataSource)
+            let useCase = GetDogsUseCase(repository: repository)
+            let viewModel = DogListViewModel(getDogsUseCase: useCase)
+            
+            DogListView(viewModel: viewModel)
         }
     }
 }
